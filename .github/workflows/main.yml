@@ -2,7 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [ 'kernel-*' ]
+    branches: [ 'build', 'kernel-*' ]
   workflow_dispatch:
 
 jobs:
@@ -17,11 +17,48 @@ jobs:
         uses: actions/checkout@v3
         with:
           ref: 'kernel-5.16'
+      
+      - name: Install Dependencies
+        if: false
+        run: |-
+          apt-get install -y --no-install-recommends \
+            ccache \
+            debian-archive-keyring \
+            debootstrap \
+            device-tree-compiler \
+            dwarves \
+            gcc-arm-linux-gnueabihf \
+            jq \
+            libbison-dev \
+            libc6-dev-armhf-cross \
+            libelf-dev \
+            libfl-dev \
+            liblz4-tool \
+            libpython2.7-dev \
+            libusb-1.0-0-dev \
+            pigz \
+            pixz \
+            pv \
+            swig \
+            pkg-config \
+            python3-distutils \
+            qemu-user-static \
+            u-boot-tools \
+            distcc \
+            uuid-dev \
+            lib32ncurses-dev \
+            lib32stdc++6 \
+            apt-cacher-ng \
+            aptly \
+            aria2 \
+            libfdt-dev \
+            libssl-dev
 
-      - name: Build
+      ## TODO: Implement building the kernel package(s)
+      - name: Build Kernel Package
         run: touch foo_1.0.0.deb
 
-      - name: Publish
+      - name: Publish Kernel Package
         uses: Didstopia/apt-repo-action@master
         with:
           branch: 'apt-repo'
