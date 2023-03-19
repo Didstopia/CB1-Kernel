@@ -1,0 +1,48 @@
+name: Sync Upstream
+
+on:
+  # To make debugging easier, run on pushes to the "custom" branch
+  push:
+    branches: [ 'custom' ]
+  # Run scheduled once a day
+  schedule:
+    - cron: '0 0 * * *' 
+  # Allow running manually
+  workflow_dispatch:
+
+jobs:
+
+  sync-upstream:
+    name: Sync Upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+
+      # Checkout the target repository (this repo)
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          # Specifically use the "kernel-5.16" branch for the target
+          ref: kernel-5.16
+          # No need to persist credentials in this case
+          persist-credentials: false
+
+      # Sync upstream repository (with automatic retry support)
+      - name: Sync Upstream Repository
+        id: sync
+        #uses: Wandalen/wretry.action@master
+        uses: Wandalen/wretry.action@v1.0.36
+        with:
+          # Attempt 3 times before giving up
+          attempt_limit: 3
+          # Delay each attempt by 1 minute
+          attempt_delay: 60000
+          # The action to run and retry on failure
+          action: aormsby/Fork-Sync-With-Upstream-action@v3.4
+          # The arguments for the retry action above
+          with: |
+            target_sync_branch: kernel-5.16
+            target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+            upstream_sync_branch: kernel-5.16
+            upstream_sync_repo: bigtreetech/CB1-Kernel
+            git_config_pull_rebase: true
