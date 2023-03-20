@@ -27,7 +27,7 @@ jobs:
             debootstrap \
             device-tree-compiler \
             dwarves \
-            gcc-arm-linux-gnueabihf \
+            gcc-11-arm-linux-gnueabihf \
             jq \
             libbison-dev \
             libc6-dev-armhf-cross \
@@ -56,16 +56,23 @@ jobs:
 
       ## TODO: Implement building the kernel package(s)
       - name: Build Kernel Package
-        run: sudo ./build.sh
+        #run: sudo ./build.sh
+        run: |
+          sudo ./build.sh \
+            BOARD=h616 \
+            BRANCH=current \
+            BUILD_OPT=kernel \
+            RELEASE=bullseye \
+            KERNEL_CONFIGURE=yes
 
       - name: Publish Kernel Package
         uses: Didstopia/apt-repo-action@master
         with:
           branch: 'apt-repo'
           platform: 'arm64'
-          # target: 'bullseye'
-          package: 'foo_1.0.0.deb'
-          version: '1.0.0'
+          target: 'bullseye'
+          package: 'outputs/debs/linux-image-current-sun50iw9_2.3.2_arm64.deb'
+          version: '2.3.2'
           # public_key: ''
           # private_key: ''
           # private_key_passphrase: ''
