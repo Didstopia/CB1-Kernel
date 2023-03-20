@@ -58,13 +58,13 @@ jobs:
       - name: Build Kernel Package
         #run: sudo ./build.sh
         run: |
-          sudo export BOARD=h616 && \
-          sudo export BRANCH=current && \
-          sudo export BUILD_OPT=kernel && \
-          sudo export RELEASE=bullseye && \
-          sudo export KERNEL_CONFIGURE=no && \
-          sudo export MANUAL_KERNEL_CONFIGURE=no && \
-          sudo export KERNEL_EXPORT_DEFCONFIG=yes && \
+          export BOARD=h616 && \
+          export BRANCH=current && \
+          export BUILD_OPT=kernel && \
+          export RELEASE=bullseye && \
+          export KERNEL_CONFIGURE=no && \
+          export MANUAL_KERNEL_CONFIGURE=no && \
+          export KERNEL_EXPORT_DEFCONFIG=yes && \
           sudo ./build.sh \
             BOARD=h616 \
             BRANCH=current \
