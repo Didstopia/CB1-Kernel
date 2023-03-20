@@ -63,6 +63,8 @@ jobs:
           sudo export BUILD_OPT=kernel && \
           sudo export RELEASE=bullseye && \
           sudo export KERNEL_CONFIGURE=no && \
+          sudo export MANUAL_KERNEL_CONFIGURE=no && \
+          sudo export KERNEL_EXPORT_DEFCONFIG=yes && \
           sudo ./build.sh \
             BOARD=h616 \
             BRANCH=current \
