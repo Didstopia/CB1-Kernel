@@ -58,6 +58,11 @@ jobs:
       - name: Build Kernel Package
         #run: sudo ./build.sh
         run: |
+          export TTY_X=98 && \
+          export TTY_Y=243 && \
+          export LINES=98 && \
+          export COLUMNS=243 && \
+          export TERM=xterm-256color && \
           export BOARD=h616 && \
           export BRANCH=current && \
           export BUILD_OPT=kernel && \
