@@ -30,9 +30,7 @@ jobs:
       - name: Setup Repo
         if: success()
         timeout-minutes: 5
-        run: |
-          mkdir -p repo packages keys
-          echo "This is the Didstopia BIGTREETECH CB1 Apt Repository." > repo/index.html
+        run: mkdir -p repo packages keys
 
       - name: Build Packages
         if: success()
