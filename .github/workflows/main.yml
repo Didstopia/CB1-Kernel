@@ -6,8 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  # BUILD_PATH: ${{ github.workspace }}/build
-  BUILD_PATH: ${{ github.workspace }}
+  BUILD_PATH: ${{ github.workspace }}/build
   OUTPUT_PATH: ${{ github.workspace }}/output
   TARGET_BRANCH: kernel-5.16
 
@@ -40,7 +39,7 @@ jobs:
         timeout-minutes: 120
         uses: didstopia/cb1-kernel-builder@master
         with:
-          repo: ${{ github.repository }}
+          repo: github.com/${{ github.repository }}
           branch: ${{ env.TARGET_BRANCH }}
           build-path: ${{ env.BUILD_PATH }}
           output-path: ${{ env.OUTPUT_PATH }}
