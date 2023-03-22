@@ -1,5 +1,31 @@
 # Debian Build for AllWinner H616
 
+## Setup APT Repository
+
+We have created our own automations to both building the BTT CB1 packages (including the kernel), as well as updating and publishing a custom apt repository, so now everyone can enjoy the latest releases from BIGTREETECH, without having to reinstall/reimage their CB1/SD card.
+
+***NOTE:*** *This is still in early development and considered experimental at this stage, so be prepared for broken releases and various unannounced changes along the way!*
+
+First you have to import the public key of the apt repository.
+
+```bash
+curl -fsSL https://didstopia.github.io/CB1-Kernel/gpg-pubkey.asc | sudo gpg --dearmor -o /usr/share/keyrings/cb1.didstopia.github.io.gpg
+```
+
+Now you can add the apt repository.
+
+```bash
+echo "deb [arch=arm64 signed-by=/usr/share/keyrings/cb1.didstopia.github.io.gpg] https://didstopia.github.io/CB1-Kernel BTT-CB1 kernel devel" | sudo tee /etc/apt/sources.list.d/cb1.didstopia.github.io.list > /dev/null
+```
+
+Finally you can refresh the apt repositories and install any packages or package updates you wish.
+
+```bash
+sudo apt update
+sudo apt install <package>
+sudo apt upgrade [package]
+```
+
 ## Tested Hardwares
 
 * [Yuzuki Chameleon](https://github.com/YuzukiHD/YuzukiChameleon)
