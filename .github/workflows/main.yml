@@ -7,87 +7,145 @@ on:
 
 jobs:
 
+  # Build job
   build:
     name: Build
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
 
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           ref: 'kernel-5.16'
-      
-      - name: Install Dependencies
-        run: |-
-          sudo apt-get update && \
-          sudo apt-get install -y --no-install-recommends \
-            ccache \
-            debian-archive-keyring \
-            debootstrap \
-            device-tree-compiler \
-            dwarves \
-            gcc-11-arm-linux-gnueabihf \
-            jq \
-            libbison-dev \
-            libc6-dev-armhf-cross \
-            libelf-dev \
-            libfl-dev \
-            liblz4-tool \
-            libpython2.7-dev \
-            libusb-1.0-0-dev \
-            pigz \
-            pixz \
-            pv \
-            swig \
-            pkg-config \
-            python3-distutils \
-            qemu-user-static \
-            u-boot-tools \
-            distcc \
-            uuid-dev \
-            lib32ncurses-dev \
-            lib32stdc++6 \
-            apt-cacher-ng \
-            aptly \
-            aria2 \
-            libfdt-dev \
-            libssl-dev
 
-      ## TODO: Implement building the kernel package(s)
-      - name: Build Kernel Package
-        #run: sudo ./build.sh
+      - name: Setup Folders
         run: |
-          export TTY_X=98 && \
-          export TTY_Y=243 && \
-          export LINES=98 && \
-          export COLUMNS=243 && \
-          export TERM=xterm-256color && \
-          export BOARD=h616 && \
-          export BRANCH=current && \
-          export BUILD_OPT=kernel && \
-          export RELEASE=bullseye && \
-          export KERNEL_CONFIGURE=no && \
-          export MANUAL_KERNEL_CONFIGURE=no && \
-          export KERNEL_EXPORT_DEFCONFIG=yes && \
-          sudo ./build.sh \
-            BOARD=h616 \
-            BRANCH=current \
-            BUILD_OPT=kernel \
-            RELEASE=bullseye \
-            KERNEL_CONFIGURE=no
+          mkdir -p repo packages keys
 
-      - name: Publish Kernel Package
-        uses: Didstopia/apt-repo-action@master
+      ## TODO: Implement this after testing and publishing the kernel builder action!
+      # - name: Build Packages
+      #   uses: didstopia/cb1-kernel-builder@master
+      #   with:
+      #     platform: 'arm64'
+      #     target: 'bullseye'
+      #     branch: 'current'
+      #     version: '2.3.2'
+      #     dry_run: true
+      #     verbose: true
+
+      ## TODO: Re-enable this once we have the package building working!
+      # - name: Copy Packages
+      #   run: |
+      #     cp -fr output/debs/*.deb packages/
+
+      - name: Build Apt Repository
+        uses: didstopia/simple-apt-repo@master
         with:
-          branch: 'apt-repo'
-          platform: 'arm64'
-          target: 'bullseye'
-          # package: 'outputs/debs/linux-image-current-sun50iw9_2.3.2_arm64.deb'
-          package: 'outputs/debs/*.deb'
-          version: '2.3.2'
-          # public_key: ''
-          # private_key: ''
-          # private_key_passphrase: ''
-          dry_run: true
-          verbose: true
+          key-public: ${{ secrets.APT_REPO_PUBLIC_KEY }}
+          key-private: ${{ secrets.APT_REPO_PRIVATE_KEY }}
+
+      - name: Upload Apt Repository
+        uses: actions/upload-pages-artifact@v1
+        with:
+          # name: github-pages
+          path: repo/
+          # retention-days: 1
+
+      # - name: Install Dependencies
+      #   run: |-
+      #     sudo apt-get update && \
+      #     sudo apt-get install -y --no-install-recommends \
+      #       ccache \
+      #       debian-archive-keyring \
+      #       debootstrap \
+      #       device-tree-compiler \
+      #       dwarves \
+      #       gcc-11-arm-linux-gnueabihf \
+      #       jq \
+      #       libbison-dev \
+      #       libc6-dev-armhf-cross \
+      #       libelf-dev \
+      #       libfl-dev \
+      #       liblz4-tool \
+      #       libpython2.7-dev \
+      #       libusb-1.0-0-dev \
+      #       pigz \
+      #       pixz \
+      #       pv \
+      #       swig \
+      #       pkg-config \
+      #       python3-distutils \
+      #       qemu-user-static \
+      #       u-boot-tools \
+      #       distcc \
+      #       uuid-dev \
+      #       lib32ncurses-dev \
+      #       lib32stdc++6 \
+      #       apt-cacher-ng \
+      #       aptly \
+      #       aria2 \
+      #       libfdt-dev \
+      #       libssl-dev
+
+      # - name: Build Kernel Package
+      #   #run: sudo ./build.sh
+      #   run: |
+      #     export TTY_X=98 && \
+      #     export TTY_Y=243 && \
+      #     export LINES=98 && \
+      #     export COLUMNS=243 && \
+      #     export TERM=xterm-256color && \
+      #     export BOARD=h616 && \
+      #     export BRANCH=current && \
+      #     export BUILD_OPT=kernel && \
+      #     export RELEASE=bullseye && \
+      #     export KERNEL_CONFIGURE=no && \
+      #     export MANUAL_KERNEL_CONFIGURE=no && \
+      #     export KERNEL_EXPORT_DEFCONFIG=yes && \
+      #     sudo ./build.sh \
+      #       BOARD=h616 \
+      #       BRANCH=current \
+      #       BUILD_OPT=kernel \
+      #       RELEASE=bullseye \
+      #       KERNEL_CONFIGURE=no
+
+      # - name: Publish Kernel Package
+      #   uses: Didstopia/apt-repo-action@master
+      #   with:
+      #     branch: 'apt-repo'
+      #     platform: 'arm64'
+      #     target: 'bullseye'
+      #     # package: 'outputs/debs/linux-image-current-sun50iw9_2.3.2_arm64.deb'
+      #     package: 'outputs/debs/*.deb'
+      #     version: '2.3.2'
+      #     # public_key: ''
+      #     # private_key: ''
+      #     # private_key_passphrase: ''
+      #     dry_run: true
+      #     verbose: true
+
+  # Deploy job
+  deploy:
+    name: Deploy
+
+    # Add a dependency to the build job
+    needs: build
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # Specify runner + deployment step
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
