@@ -69,6 +69,11 @@ jobs:
           key-public: ${{ secrets.APT_REPO_PUBLIC_KEY }}
           key-private: ${{ secrets.APT_REPO_PRIVATE_KEY }}
 
+      - name: Generate Repository File Index
+        uses: jayanta525/github-pages-directory-listing@v3.0.0
+        with:
+          FOLDER: repo
+
       - name: List Repository Contents
         if: success()
         run: ls -la ${{ github.workspace }}/repo/
