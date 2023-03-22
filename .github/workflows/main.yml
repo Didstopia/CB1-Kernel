@@ -5,41 +5,59 @@ on:
     branches: [ 'build', 'kernel-*' ]
   workflow_dispatch:
 
+env:
+  # BUILD_PATH: ${{ github.workspace }}/build
+  BUILD_PATH: ${{ github.workspace }}
+  OUTPUT_PATH: ${{ github.workspace }}/output
+  TARGET_BRANCH: kernel-5.16
+
 jobs:
 
   # Build job
   build:
     name: Build
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300 ## TODO: Increase this if necessary! Benchmark a bit, look into caching etc.
+    strategy:
+      fail-fast: true
     steps:
 
       - name: Checkout Repository
+        timeout-minutes: 15
         uses: actions/checkout@v3
         with:
-          ref: 'kernel-5.16'
+          ref: ${{ env.TARGET_BRANCH }}
 
-      - name: Setup Folders
+      - name: Setup Repo
+        if: success()
+        timeout-minutes: 5
         run: |
           mkdir -p repo packages keys
+          echo "This is the Didstopia BIGTREETECH CB1 Apt Repository." > repo/index.html
 
-      ## TODO: Implement this after testing and publishing the kernel builder action!
-      # - name: Build Packages
-      #   uses: didstopia/cb1-kernel-builder@master
-      #   with:
-      #     platform: 'arm64'
-      #     target: 'bullseye'
-      #     branch: 'current'
-      #     version: '2.3.2'
-      #     dry_run: true
-      #     verbose: true
+      - name: Build Packages
+        if: success()
+        timeout-minutes: 120
+        uses: didstopia/cb1-kernel-builder@master
+        with:
+          repo: ${{ github.repository }}
+          branch: ${{ env.TARGET_BRANCH }}
+          build-path: ${{ env.BUILD_PATH }}
+          output-path: ${{ env.OUTPUT_PATH }}
+          target-board: h616
+          target-branch: current
+          target-build-option: kernel
+          target-release: bullseye
 
-      ## TODO: Re-enable this once we have the package building working!
-      # - name: Copy Packages
-      #   run: |
-      #     cp -fr output/debs/*.deb packages/
+      - name: Copy Packages
+        if: success()
+        timeout-minutes: 5
+        run: |
+          cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ github.workspace }}/packages/
 
       - name: Build Apt Repository
+        if: success()
+        timeout-minutes: 5
         uses: didstopia/simple-apt-repo@master
         with:
           # timezone: Europe/Helsinki
@@ -51,7 +69,13 @@ jobs:
           key-public: ${{ secrets.APT_REPO_PUBLIC_KEY }}
           key-private: ${{ secrets.APT_REPO_PRIVATE_KEY }}
 
+      - name: List Repository Contents
+        if: success()
+        run: ls -la ${{ github.workspace }}/repo/
+
       - name: Upload Apt Repository
+        if: success()
+        timeout-minutes: 15
         uses: actions/upload-pages-artifact@v1
         with:
           # name: github-pages
