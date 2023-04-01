@@ -54,13 +54,6 @@ jobs:
         with:
           ref: ${{ env.TARGET_BRANCH }}
 
-      - name: Cache Packages
-        id: cache-packages
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.PACKAGES_PATH }}
-          key: ${{ runner.os }}-packages-${{ hashfiles('packages/**/*') }}
-
       - name: Prepare Environment
         timeout-minutes: 5
         run: mkdir -p ${{ env.REPO_PATH }} ${{ env.PACKAGES_PATH }} ${{ env.KEYS_PATH }}
@@ -88,6 +81,14 @@ jobs:
           # target-branch: cb1-${{ env.TARGET_BRANCH }}
           target-build-option: kernel # FIXME: We also want to build u-boot AND the image, right?!
           target-release: bullseye    # FIXME: Do we want to set this to something else?
+
+      - name: Cache Packages
+        id: cache-packages
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.PACKAGES_PATH }}
+          #key: ${{ runner.os }}-packages-${{ hashfiles('packages/**/*') }}
+          key: ${{ runner.os }}-packages-${{ hashfiles('packages/*.deb') }}
 
       - name: Copy Packages
         id: copy-packages
