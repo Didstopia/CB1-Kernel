@@ -25,6 +25,12 @@ on:
   push:
     branches: [ 'build', 'kernel-*' ]
   workflow_dispatch:
+    inputs:
+      force:
+        type: boolean
+        description: 'Whether to force a build and update the cache or not. (optional, eg. `true`, default: `false`)'
+        required: false
+        default: false
 
 env:
   REPO_PATH: ${{ github.workspace }}/repo
@@ -87,8 +93,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.PACKAGES_PATH }}
-          #key: ${{ runner.os }}-packages-${{ hashfiles('packages/**/*') }}
-          key: ${{ runner.os }}-packages-${{ hashfiles('packages/*.deb') }}
+          key: ${{ runner.os }}-packages-${{ hashFiles('packages/**/*') }}
+          # key: ${{ runner.os }}-packages-${{ hashFiles('packages/*.deb') }}
 
       - name: Copy Packages
         id: copy-packages
@@ -97,7 +103,11 @@ jobs:
           # Generate hashes for the previous and new packages
           OLD_PACKAGES_HASH=${{ hashFiles('packages/**/*') }}
           NEW_PACKAGES_HASH=${{ hashFiles('output/**/*') }}
-          if [ "$OLD_PACKAGES_HASH" = "$NEW_PACKAGES_HASH" ]; then
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            # Copy any built packages to the packages folder
+            cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          elif [ "$OLD_PACKAGES_HASH" = "$NEW_PACKAGES_HASH" ]; then
             # No changes to packages, no update necessary
             echo "update=false" >> "$GITHUB_OUTPUT"
           else
