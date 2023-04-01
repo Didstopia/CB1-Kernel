@@ -6,9 +6,13 @@ on:
   workflow_dispatch:
 
 env:
+  REPO_PATH: ${{ github.workspace }}/repo
+  PACKAGES_PATH: ${{ github.workspace }}/packages
+  KEYS_PATH: ${{ github.workspace }}/keys
   BUILD_PATH: ${{ github.workspace }}/build
   OUTPUT_PATH: ${{ github.workspace }}/output
   TARGET_BRANCH: kernel-5.16
+  PACKAGES_ARTIFACT: 'cb1-kernel-packages'
 
 jobs:
 
@@ -27,10 +31,19 @@ jobs:
         with:
           ref: ${{ env.TARGET_BRANCH }}
 
-      - name: Setup Repo
+      - name: Prepare Environment
         if: success()
         timeout-minutes: 5
-        run: mkdir -p repo packages keys
+        run: mkdir -p ${{ env.REPO_PATH }} ${{ env.PACKAGES_PATH }} ${{ env.KEYS_PATH }}
+
+      - name: Download Packages
+        if: success()
+        timeout-minutes: 15
+        uses: actions/download-artifact@v3
+        id: download-packages
+        with:
+          name: ${{ env.PACKAGES_ARTIFACT }}
+          path: ${{ env.PACKAGES_PATH }}
 
       - name: Build Packages
         if: success()
@@ -42,15 +55,29 @@ jobs:
           build-path: ${{ env.BUILD_PATH }}
           output-path: ${{ env.OUTPUT_PATH }}
           target-board: h616
-          target-branch: current
-          target-build-option: kernel
-          target-release: bullseye
+          target-branch: current      # FIXME: Set this to something more appropriate?
+          target-build-option: kernel # FIXME: We also want to build u-boot AND the image, right?!
+          target-release: bullseye    # FIXME: Set this to something more appropriate?
 
       - name: Copy Packages
         if: success()
         timeout-minutes: 5
         run: |
-          cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ github.workspace }}/packages/
+          cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
+
+      - name: List Packages
+        if: success()
+        run: ls -la ${{ env.PACKAGES_PATH }}/
+
+      - name: Upload Packages
+        if: success()
+        timeout-minutes: 15
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.PACKAGES_ARTIFACT }}
+          path: ${{ steps.download-packages.outputs.download-path }}
+          retention-days: 30
+          if-no-files-found: error
 
       - name: Build Apt Repository
         if: success()
@@ -74,89 +101,15 @@ jobs:
 
       - name: List Repository Contents
         if: success()
-        run: ls -la ${{ github.workspace }}/repo/
+        run: ls -la ${{ env.REPO_PATH }}/
 
       - name: Upload Apt Repository
         if: success()
         timeout-minutes: 15
         uses: actions/upload-pages-artifact@v1
         with:
-          # name: github-pages
-          path: repo/
-          # retention-days: 1
-
-      # - name: Install Dependencies
-      #   run: |-
-      #     sudo apt-get update && \
-      #     sudo apt-get install -y --no-install-recommends \
-      #       ccache \
-      #       debian-archive-keyring \
-      #       debootstrap \
-      #       device-tree-compiler \
-      #       dwarves \
-      #       gcc-11-arm-linux-gnueabihf \
-      #       jq \
-      #       libbison-dev \
-      #       libc6-dev-armhf-cross \
-      #       libelf-dev \
-      #       libfl-dev \
-      #       liblz4-tool \
-      #       libpython2.7-dev \
-      #       libusb-1.0-0-dev \
-      #       pigz \
-      #       pixz \
-      #       pv \
-      #       swig \
-      #       pkg-config \
-      #       python3-distutils \
-      #       qemu-user-static \
-      #       u-boot-tools \
-      #       distcc \
-      #       uuid-dev \
-      #       lib32ncurses-dev \
-      #       lib32stdc++6 \
-      #       apt-cacher-ng \
-      #       aptly \
-      #       aria2 \
-      #       libfdt-dev \
-      #       libssl-dev
-
-      # - name: Build Kernel Package
-      #   #run: sudo ./build.sh
-      #   run: |
-      #     export TTY_X=98 && \
-      #     export TTY_Y=243 && \
-      #     export LINES=98 && \
-      #     export COLUMNS=243 && \
-      #     export TERM=xterm-256color && \
-      #     export BOARD=h616 && \
-      #     export BRANCH=current && \
-      #     export BUILD_OPT=kernel && \
-      #     export RELEASE=bullseye && \
-      #     export KERNEL_CONFIGURE=no && \
-      #     export MANUAL_KERNEL_CONFIGURE=no && \
-      #     export KERNEL_EXPORT_DEFCONFIG=yes && \
-      #     sudo ./build.sh \
-      #       BOARD=h616 \
-      #       BRANCH=current \
-      #       BUILD_OPT=kernel \
-      #       RELEASE=bullseye \
-      #       KERNEL_CONFIGURE=no
-
-      # - name: Publish Kernel Package
-      #   uses: Didstopia/apt-repo-action@master
-      #   with:
-      #     branch: 'apt-repo'
-      #     platform: 'arm64'
-      #     target: 'bullseye'
-      #     # package: 'outputs/debs/linux-image-current-sun50iw9_2.3.2_arm64.deb'
-      #     package: 'outputs/debs/*.deb'
-      #     version: '2.3.2'
-      #     # public_key: ''
-      #     # private_key: ''
-      #     # private_key_passphrase: ''
-      #     dry_run: true
-      #     verbose: true
+          path: ${{ env.REPO_PATH }}/
+          retention-days: 1
 
   # Deploy job
   deploy:
