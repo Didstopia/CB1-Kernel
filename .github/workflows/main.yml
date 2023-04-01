@@ -87,8 +87,8 @@ jobs:
         timeout-minutes: 5
         run: |
           # Generate hashes for the previous and new packages
-          OLD_PACKAGES_HASH=${{ hashFiles(env.PACKAGES_PATH/**/*) }}
-          NEW_PACKAGES_HASH=${{ hashFiles(env.OUTPUT_PATH/**/*) }}
+          OLD_PACKAGES_HASH=${{ hashFiles('packages/**/*') }}
+          NEW_PACKAGES_HASH=${{ hashFiles('output/**/*') }}
           if [ "$OLD_PACKAGES_HASH" = "$NEW_PACKAGES_HASH" ]; then
             # No changes to packages, no update necessary
             echo "update=false" >> "$GITHUB_OUTPUT"
