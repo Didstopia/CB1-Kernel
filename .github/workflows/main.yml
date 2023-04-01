@@ -1,6 +1,27 @@
-name: Build
+##
+## TODO: The following issues still needs to be fixed
+##
+## - [ ] Fix the apt repo itself, so it's a valid apt repo, compatible with Debian etc.
+##
+## - [ ] Build time dependencies, possibly even cached build files, should be cached appropriately,
+##       as otherwise builds can take a VERY long time to complete!
+##
+## - [ ] Update the apt repo instead of replacing it, possibly by simply caching the packages?
+##
+## - [ ] Rename or refactor the built kernel version, at the very least append a timestamp
+##       and/or a short git commit hash, so we can easily distinguish between different versions
+##
+## - [ ] Decide on the appropriate codename, suite, components etc. and stick with that naming
+##
+## - [ ] Run a quick automated test after deploying the apt repo to GitHub Pages,
+##       just to confirm that a) the website is functional and b) it is a valid apt repo (if possible)
+##
+
+name: Build and Deploy
 
 on:
+  ## TODO: Setup scheduled builds, but only after we have caching working!
+  ## TODO: Setup proper commit, PR, tags etc. building rules, also after caching works!
   push:
     branches: [ 'build', 'kernel-*' ]
   workflow_dispatch:
@@ -55,9 +76,11 @@ jobs:
           build-path: ${{ env.BUILD_PATH }}
           output-path: ${{ env.OUTPUT_PATH }}
           target-board: h616
-          target-branch: current      # FIXME: Set this to something more appropriate?
+          target-branch: current      # FIXME: Should be keep this "current", to match the official builds?
+          # target-branch: ${{ env.TARGET_BRANCH }}
+          # target-branch: cb1-${{ env.TARGET_BRANCH }}
           target-build-option: kernel # FIXME: We also want to build u-boot AND the image, right?!
-          target-release: bullseye    # FIXME: Set this to something more appropriate?
+          target-release: bullseye    # FIXME: Do we want to set this to something else?
 
       - name: Copy Packages
         if: success()
