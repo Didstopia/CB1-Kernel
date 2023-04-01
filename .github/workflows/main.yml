@@ -44,6 +44,8 @@ jobs:
     timeout-minutes: 300 ## TODO: Increase this if necessary! Benchmark a bit, look into caching etc.
     strategy:
       fail-fast: true
+    outputs:
+      updated: ${{ steps.copy-packages.outputs.update }}
     steps:
 
       - name: Checkout Repository
@@ -53,22 +55,19 @@ jobs:
           ref: ${{ env.TARGET_BRANCH }}
 
       - name: Prepare Environment
-        if: success()
         timeout-minutes: 5
         run: mkdir -p ${{ env.REPO_PATH }} ${{ env.PACKAGES_PATH }} ${{ env.KEYS_PATH }}
 
       ## TODO: Re-enable once we have uploaded something
-      #- name: Download Packages
-      #  if: success()
-      #  timeout-minutes: 15
-      #  uses: actions/download-artifact@v3
-      #  id: download-packages
-      #  with:
-      #    name: ${{ env.PACKAGES_ARTIFACT }}
-      #    path: ${{ env.PACKAGES_PATH }}
+      - name: Download Packages
+        timeout-minutes: 15
+        uses: actions/download-artifact@v3
+        id: download-packages
+        with:
+          name: ${{ env.PACKAGES_ARTIFACT }}
+          path: ${{ env.PACKAGES_PATH }}
 
       - name: Build Packages
-        if: success()
         timeout-minutes: 120
         uses: didstopia/cb1-kernel-builder@master
         with:
@@ -84,29 +83,38 @@ jobs:
           target-release: bullseye    # FIXME: Do we want to set this to something else?
 
       - name: Copy Packages
-        if: success()
+        id: copy-packages
         timeout-minutes: 5
         run: |
-          cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
+          # Generate hashes for the previous and new packages
+          OLD_PACKAGES_HASH=${{ hashFiles(env.PACKAGES_PATH/**/*) }}
+          NEW_PACKAGES_HASH=${{ hashFiles(env.OUTPUT_PATH/**/*) }}
+          if [ "$OLD_PACKAGES_HASH" = "$NEW_PACKAGES_HASH" ]; then
+            # No changes to packages, no update necessary
+            echo "update=false" >> "$GITHUB_OUTPUT"
+          else
+            # Copy any built packages to the packages folder
+            cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
+            echo "update=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: List Packages
-        if: success()
         run: ls -la ${{ env.PACKAGES_PATH }}/
 
       - name: Upload Packages
-        if: success()
+        if: ${{ steps.copy-packages.outputs.update == 'true' }}
         timeout-minutes: 15
         uses: actions/upload-artifact@v3
         with:
           name: ${{ env.PACKAGES_ARTIFACT }}
           ## TODO: Re-enable once we have uploaded something
-          #path: ${{ steps.download-packages.outputs.download-path }}
-          path: ${{ env.PACKAGES_PATH }}
+          path: ${{ steps.download-packages.outputs.download-path }}
+          #path: ${{ env.PACKAGES_PATH }}
           retention-days: 30
           if-no-files-found: error
 
       - name: Build Apt Repository
-        if: success()
+        if: ${{ steps.copy-packages.outputs.update == 'true' }}
         timeout-minutes: 5
         uses: didstopia/simple-apt-repo@master
         with:
@@ -121,16 +129,17 @@ jobs:
           key-private: ${{ secrets.APT_REPO_PRIVATE_KEY }}
 
       - name: Generate Repository File Index
+        if: ${{ steps.copy-packages.outputs.update == 'true' }}
         uses: jayanta525/github-pages-directory-listing@v3.0.0
         with:
           FOLDER: repo
 
       - name: List Repository Contents
-        if: success()
+        if: ${{ steps.copy-packages.outputs.update == 'true' }}
         run: ls -la ${{ env.REPO_PATH }}/
 
       - name: Upload Apt Repository
-        if: success()
+        if: ${{ steps.copy-packages.outputs.update == 'true' }}
         timeout-minutes: 15
         uses: actions/upload-pages-artifact@v1
         with:
@@ -143,6 +152,9 @@ jobs:
 
     # Add a dependency to the build job
     needs: build
+    
+    # Only run if we got new builds
+    if: ${{ needs.build.outputs.updated }}
 
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
