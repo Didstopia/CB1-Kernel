@@ -73,6 +73,14 @@ jobs:
       #    name: ${{ env.PACKAGES_ARTIFACT }}
       #    path: ${{ env.PACKAGES_PATH }}
 
+      ## TODO: This is only a test! This might not work AT ALL because there's a ton of files!
+      - name: Cache Build
+        id: cache-build
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.BUILD_PATH }}
+          key: ${{ runner.os }}-build-${{ env.TARGET_BRANCH }}
+
       - name: Build Packages
         timeout-minutes: 120
         uses: didstopia/cb1-kernel-builder@master
@@ -93,7 +101,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.PACKAGES_PATH }}
-          key: ${{ runner.os }}-packages-${{ hashFiles('packages/**/*') }}
+          key: ${{ runner.os }}-packages-${{ env.TARGET_BRANCH }}
+          # key: ${{ runner.os }}-packages-${{ hashFiles('packages/**/*') }}
           # key: ${{ runner.os }}-packages-${{ hashFiles('packages/*.deb') }}
 
       - name: Copy Packages
