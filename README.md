@@ -15,7 +15,7 @@ curl -fsSL https://didstopia.github.io/CB1-Kernel/gpg-pubkey.asc | sudo gpg --de
 Now you can add the apt repository.
 
 ```bash
-echo "deb [arch=arm64 signed-by=/usr/share/keyrings/cb1.didstopia.github.io.gpg] https://didstopia.github.io/CB1-Kernel BTT-CB1 kernel devel" | sudo tee /etc/apt/sources.list.d/cb1.didstopia.github.io.list > /dev/null
+echo "deb [arch=arm64 signed-by=/usr/share/keyrings/cb1.didstopia.github.io.gpg] https://didstopia.github.io/CB1-Kernel bullseye main" | sudo tee /etc/apt/sources.list.d/cb1.didstopia.github.io.list > /dev/null
 ```
 
 Finally you can refresh the apt repositories and install any packages or package updates you wish.
