@@ -59,7 +59,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ${{ env.PACKAGES_PATH }}
-          key: ${{ runner.os }}-packages-${{ hashfiles('packages/**/*) }}
+          key: ${{ runner.os }}-packages-${{ hashfiles('packages/**/*') }}
 
       - name: Prepare Environment
         timeout-minutes: 5
