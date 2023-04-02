@@ -64,9 +64,33 @@ jobs:
         timeout-minutes: 5
         run: mkdir -p ${{ env.REPO_PATH }} ${{ env.PACKAGES_PATH }} ${{ env.KEYS_PATH }}
 
+      - name: Prepare Kernel
+        id: prepare-kernel
+        timeout-minutes: 15
+        uses: didstopia/cb1-kernel-builder@master
+        with:
+          repo: github.com/${{ github.repository }}
+          branch: ${{ env.TARGET_BRANCH }}
+          build-path: ${{ env.BUILD_PATH }}
+          only-detect-kernel-version: yes
+
+      - name: Check Kernel Revision
+        id: check-kernel-revision
+        run: |-
+          REVISION="${{ steps.prepare-kernel.outputs.revision }}"
+          echo "Detected kernel revision: ${REVISION}"
+          echo "NOTICE: Kernel revision checks not yet implemented!"
+          echo "is_new_revision=true" > $GITHUB_OUTPUT
+          ## TODO: This should check the output of steps.prepare-kernel.outputs.revision,
+          ##       then compare that with the latest available tag/release,
+          ##       and continue building if the revision is newer, as well as
+          ##       create a new tag, a new release and automatic changelog
+          ##       from all commits between the last tag and this one!
+
       ## TODO: This is only a test! This might not work AT ALL because there's a ton of files!
       - name: Cache Build
         id: cache-build
+        if: ${{ steps.check-kernel-revision.outputs.is_new_revision == 'true' }}
         uses: actions/cache@v3
         with:
           #path: ${{ env.BUILD_PATH }}
@@ -74,7 +98,8 @@ jobs:
           key: ${{ runner.os }}-build-${{ env.TARGET_BRANCH }}
 
       - name: Build Kernel
-        timeout-minutes: 120
+        if: ${{ steps.check-kernel-revision.outputs.is_new_revision == 'true' }}
+        timeout-minutes: 60 # NOTE: This typically takes less than an hour, but may take longer!
         uses: didstopia/cb1-kernel-builder@master
         with:
           repo: github.com/${{ github.repository }}
@@ -89,6 +114,7 @@ jobs:
           target-release: bullseye    # FIXME: Do we want to set this to something else?
 
       - name: Build U-Boot
+        if: ${{ steps.check-kernel-revision.outputs.is_new_revision == 'true' }}
         timeout-minutes: 120
         uses: didstopia/cb1-kernel-builder@master
         with:
@@ -106,7 +132,7 @@ jobs:
       - name: Copy Packages
         id: copy-packages
         timeout-minutes: 5
-        run: |
+        run: |-
           # Generate hashes for the previous and new packages
           OLD_PACKAGES_HASH=${{ hashFiles('packages/**/*') }}
           NEW_PACKAGES_HASH=${{ hashFiles('output/**/*') }}
@@ -118,6 +144,11 @@ jobs:
           elif [ "$OLD_PACKAGES_HASH" = "$NEW_PACKAGES_HASH" ]; then
             # No changes to packages, no update necessary
             echo "update=false" >> "$GITHUB_OUTPUT"
+          elif [ "${{ steps.check-kernel-revision.outputs.is_new_revision }}" = "true" ]; then
+            # Copy any built packages to the packages folder
+            #cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
+            find ${{ env.OUTPUT_PATH }} -name '*.deb' -exec cp -prv '{}' '${{ env.PACKAGES_PATH }}/' ';'
+            echo "update=true" >> "$GITHUB_OUTPUT"
           else
             # Copy any built packages to the packages folder
             #cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
@@ -126,17 +157,20 @@ jobs:
           fi
 
       - name: List Packages
+        #if: ${{ steps.copy-packages.outputs.update == 'true' }}
         run: ls -la ${{ env.PACKAGES_PATH }}/
 
       - name: Cache Packages
+        #if: ${{ steps.copy-packages.outputs.update == 'true' }}
         id: cache-packages
         uses: actions/cache@v3
         with:
           #path: ${{ env.PACKAGES_PATH }}
           path: packages/
-          key: ${{ runner.os }}-packages-${{ env.TARGET_BRANCH }}
+          # key: ${{ runner.os }}-packages-${{ env.TARGET_BRANCH }}
           # key: ${{ runner.os }}-packages-${{ hashFiles('packages/**/*') }}
           # key: ${{ runner.os }}-packages-${{ hashFiles('packages/*.deb') }}
+          key: ${{ runner.os }}-packages-${{ hashFiles('**.deb') }}
 
       - name: Upload Build Artifacts
         if: ${{ steps.copy-packages.outputs.update == 'true' }}
@@ -150,7 +184,7 @@ jobs:
           if-no-files-found: error
 
       - name: Build Apt Repository
-        if: ${{ steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true' }}
+        if: ${{ (steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true') }}
         timeout-minutes: 5
         uses: didstopia/simple-apt-repo@master
         with:
@@ -165,17 +199,17 @@ jobs:
           key-private: ${{ secrets.APT_REPO_PRIVATE_KEY }}
 
       - name: Generate Repository File Index
-        if: ${{ steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true' }}
+        if: ${{ (steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true') }}
         uses: jayanta525/github-pages-directory-listing@v3.0.0
         with:
           FOLDER: repo
 
       - name: List Repository Contents
-        if: ${{ steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true' }}
+        if: ${{ (steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true') }}
         run: ls -la ${{ env.REPO_PATH }}/
 
       - name: Upload Apt Repository
-        if: ${{ steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true' }}
+        if: ${{ (steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true') }}
         timeout-minutes: 15
         uses: actions/upload-pages-artifact@v1
         with:
