@@ -99,7 +99,7 @@ jobs:
 
       - name: Build Kernel
         if: ${{ steps.check-kernel-revision.outputs.is_new_revision == 'true' }}
-        timeout-minutes: 60 # NOTE: This typically takes less than an hour, but may take longer!
+        timeout-minutes: 120 # NOTE: This typically takes less than an hour, but may take longer!
         uses: didstopia/cb1-kernel-builder@master
         with:
           repo: github.com/${{ github.repository }}
