@@ -20,10 +20,23 @@
 name: Build and Deploy
 
 on:
+
   ## TODO: Setup scheduled builds, but only after we have caching working!
   ## TODO: Setup proper commit, PR, tags etc. building rules, also after caching works!
-  push:
-    branches: [ 'build', 'kernel-*' ]
+  #push:
+  #  branches: [ 'build', 'kernel-*' ]
+  ## FIXME: Add tag based builds, depending on how we want to handle
+  ##        building, deploying and releasing different things?!
+  
+  # Run on a schedule
+  # (note that caches are only kept for a week)
+  schedule:
+    # Run once a week, every Monday morning
+    # - cron: '0 3 * * MON'
+    # Run once a day
+    - cron: '0 3 * * *'
+
+# Run when manually triggered
   workflow_dispatch:
     inputs:
       force:
@@ -207,6 +220,8 @@ jobs:
       - name: List Repository Contents
         if: ${{ (steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true') }}
         run: ls -la ${{ env.REPO_PATH }}/
+
+      ## TODO: Customize apt repository HTML/JS/CSS here!
 
       - name: Upload Apt Repository
         if: ${{ (steps.copy-packages.outputs.update == 'true' || steps.cache-packages.outputs.cache-hit != 'true') }}
