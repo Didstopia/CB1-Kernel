@@ -90,15 +90,69 @@ jobs:
       - name: Check Kernel Revision
         id: check-kernel-revision
         run: |-
-          REVISION="${{ steps.prepare-kernel.outputs.revision }}"
-          echo "Detected kernel revision: ${REVISION}"
-          echo "NOTICE: Kernel revision checks not yet implemented!"
-          echo "is_new_revision=true" > $GITHUB_OUTPUT
-          ## TODO: This should check the output of steps.prepare-kernel.outputs.revision,
-          ##       then compare that with the latest available tag/release,
-          ##       and continue building if the revision is newer, as well as
-          ##       create a new tag, a new release and automatic changelog
-          ##       from all commits between the last tag and this one!
+          ## TODO: Add/change echo statements to utilize GHA logging instead!
+          
+          ## TODO: Add support for "pre-release" revisions, based on
+          ##       commit hashes, if possible or feasible?
+          
+          # Prepare the target kernel revision and the revision update state
+          CURRENT_REVISION="current"
+          TARGET_REVISION="current"
+          IS_NEW_REVISION="false"
+          
+          # Detect and validate the current kernel revision (eg. "2.3.2")
+          CURRENT_REVISION_NEW=${{ steps.prepare-kernel.outputs.revision }}
+          if [ -z "$CURRENT_REVISION_NEW" ]; then
+            # Output the current values and exit with an error code
+            echo "target_revision=${TARGET_REVISION}" > $GITHUB_OUTPUT
+            echo "is_new_revision=${IS_NEW_REVISION}" > $GITHUB_OUTPUT
+            echo "Failed to get the current kernel revision"
+            exit 1
+          else
+            # Store and log the current kernel revision
+            CURRENT_REVISION="${CURRENT_REVISION_NEW}"
+            echo "Detected current kernel revision: ${CURRENT_REVISION_NEW}"
+          fi
+          
+          ## TODO: Hopefully we don't need to do this,
+          ##       as the tags may change between the initial
+          ##       repo checkout and when this runs!
+          # Fetch the latest tags
+          #git fetch --tags
+          
+          # Get the latest repository tag, remove the "V" prefix
+          # (if any), and validate it as the new kernel revision
+          TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1`)
+          TARGET_REVISION_NEW=${TARGET_REVISION_NEW#V}
+          if [ -z "$TARGET_REVISION_NEW" ]; then
+            # Output the current values and exit with an error code
+            echo "target_revision=${TARGET_REVISION}" > $GITHUB_OUTPUT
+            echo "is_new_revision=${IS_NEW_REVISION}" > $GITHUB_OUTPUT
+            echo "Failed to get the new kernel revision"
+            exit 1
+          else
+            # Store and log the new current kernel revision
+            TARGET_REVISION="${TARGET_REVISION_NEW}"
+            echo "Detected new kernel revision: ${TARGET_REVISION_NEW}"
+          fi
+          
+          # Compare the current and new kernel revisions
+          if [ "$CURRENT_REVISION_NEW" = "$TARGET_REVISION" ]; then
+            echo "Detected no changes between kernel revisions"
+            IS_NEW_REVISION="false"
+          else
+            ## TODO: Wouldn't it make more sense to do semver compatible
+            ##       version comparisons, but also validate them as semvers?
+            echo "Detected changes between kernel revisions"
+            IS_NEW_REVISION="true"
+          fi
+          
+          # Output the target kernel revision and the revision update state
+          echo "Generating output data:"
+          echo "-> target_revision=${TARGET_REVISION}
+          echo "-> is_new_revision=${IS_NEW_REVISION}
+          echo "target_revision=${TARGET_REVISION}" > $GITHUB_OUTPUT
+          echo "is_new_revision=${IS_NEW_REVISION}" > $GITHUB_OUTPUT
 
       ## TODO: This is only a test! This might not work AT ALL because there's a ton of files!
       - name: Cache Build
@@ -120,7 +174,8 @@ jobs:
           build-path: ${{ env.BUILD_PATH }}
           output-path: ${{ env.OUTPUT_PATH }}
           target-board: h616
-          target-branch: current      # FIXME: Should be keep this "current", to match the official builds?
+          target-branch: ${{ steps.check-kernel-revision.outputs.target_revision }}
+          # target-branch: current      # FIXME: Should be keep this "current", to match the official builds?
           # target-branch: ${{ env.TARGET_BRANCH }}
           # target-branch: cb1-${{ env.TARGET_BRANCH }}
           target-build-option: kernel # FIXME: We also want to build u-boot AND the image, right?!
@@ -136,12 +191,15 @@ jobs:
           build-path: ${{ env.BUILD_PATH }}
           output-path: ${{ env.OUTPUT_PATH }}
           target-board: h616
-          target-branch: current      # FIXME: Should be keep this "current", to match the official builds?
+          target-branch: ${{ steps.check-kernel-revision.outputs.target_revision }}
+          # target-branch: current      # FIXME: Should be keep this "current", to match the official builds?
           # target-branch: ${{ env.TARGET_BRANCH }}
           # target-branch: cb1-${{ env.TARGET_BRANCH }}
           target-build-option: u-boot # FIXME: We also want to build u-boot AND the image, right?!
           target-release: bullseye    # FIXME: Do we want to set this to something else?
 
+      ## TODO: Does this even work correctly? Pretty sure it does NOT,
+      ##       and instead it just updates the packages with every single run?!
       - name: Copy Packages
         id: copy-packages
         timeout-minutes: 5
@@ -149,30 +207,41 @@ jobs:
           # Generate hashes for the previous and new packages
           OLD_PACKAGES_HASH=${{ hashFiles('packages/**/*') }}
           NEW_PACKAGES_HASH=${{ hashFiles('output/**/*') }}
+          
+          # Check if we are forcefully updating
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            echo "Forced update detected, updating all packages (where possible)"
             # Copy any built packages to the packages folder
             #cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
             find ${{ env.OUTPUT_PATH }} -name '*.deb' -exec cp -prv '{}' '${{ env.PACKAGES_PATH }}/' ';'
             echo "update=true" >> "$GITHUB_OUTPUT"
+          # Check if the package hashes haven't changed
           elif [ "$OLD_PACKAGES_HASH" = "$NEW_PACKAGES_HASH" ]; then
+            echo "No changes detected in packages, skipping updates"
             # No changes to packages, no update necessary
             echo "update=false" >> "$GITHUB_OUTPUT"
+          # Check if we have a new kernel revision
           elif [ "${{ steps.check-kernel-revision.outputs.is_new_revision }}" = "true" ]; then
+            echo "New kernel revision detected, updating all packages (where possible)"
             # Copy any built packages to the packages folder
             #cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
             find ${{ env.OUTPUT_PATH }} -name '*.deb' -exec cp -prv '{}' '${{ env.PACKAGES_PATH }}/' ';'
             echo "update=true" >> "$GITHUB_OUTPUT"
+          # Fallback, update all packages where possible
           else
+            echo "Fallback detected, updating all packages (where possible)"
             # Copy any built packages to the packages folder
             #cp -fr ${{ env.OUTPUT_PATH }}/debs/*.deb ${{ env.PACKAGES_PATH }}/
             find ${{ env.OUTPUT_PATH }} -name '*.deb' -exec cp -prv '{}' '${{ env.PACKAGES_PATH }}/' ';'
             echo "update=true" >> "$GITHUB_OUTPUT"
           fi
 
+      ## TODO: Remove when done debugging!
       - name: List Packages
         #if: ${{ steps.copy-packages.outputs.update == 'true' }}
-        run: ls -la ${{ env.PACKAGES_PATH }}/
+        run: ls -la ${{ env.PACKAGES_PATH }}/ || true
 
+      ## TODO: Does this work? Verify that it does!
       - name: Cache Packages
         #if: ${{ steps.copy-packages.outputs.update == 'true' }}
         id: cache-packages
@@ -185,6 +254,8 @@ jobs:
           # key: ${{ runner.os }}-packages-${{ hashFiles('packages/*.deb') }}
           key: ${{ runner.os }}-packages-${{ hashFiles('**.deb') }}
 
+      ## TODO: Verify that this works as intended, as we're
+      ##       likely getting package updates when we shouldn't be..
       - name: Upload Build Artifacts
         if: ${{ steps.copy-packages.outputs.update == 'true' }}
         timeout-minutes: 15
