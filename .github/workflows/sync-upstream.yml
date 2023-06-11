@@ -51,24 +51,13 @@ jobs:
           # The action to run and retry on failure
           action: aormsby/Fork-Sync-With-Upstream-action@v3.4
           # The arguments for the retry action above
-          with: |-
-            # Set the upstream repository
+          with: |
             upstream_sync_repo: bigtreetech/CB1-Kernel
-            # Set the upstream branch/ref to the requested ref, or a hardcoded fallback value
             upstream_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
-            # Deal with merge conflicts by always preferring upstream,
-            # and in some cases also allowing unrelated histories when merging,
-            # with the unshallow option dealing with non-zero depth issues
             upstream_pull_args: '-s recursive -Xtheirs --allow-unrelated-histories --unshallow'
-            # Set the target branch/ref to the requested ref, or a hardcoded fallback value
             target_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
-            # Always force push everything, including tags
             target_branch_push_args: '--force --all'
-            # GitHub token which gives us push privileges
             target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-            # Increase the shallow depth time range
             shallow_since: '6 months ago'
-            # Enable git rebasing
             git_config_pull_rebase: true
-            # Enable test mode for dry run testing and debugging
-            #test_mode: true
+            test_mode: false
