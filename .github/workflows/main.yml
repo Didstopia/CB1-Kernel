@@ -132,14 +132,14 @@ jobs:
           
           # Get the latest repository tag, remove the "V" prefix
           # (if any), and validate it as the new kernel revision
-          TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null)
-          TARGET_REVISION_NEW=${TARGET_REVISION_NEW#V}
+          TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1 2>/dev/null` 2>/dev/null)
           if [ -z "$TARGET_REVISION_NEW" ]; then
             # Target the current revision instead
             TARGET_REVISION_NEW="${CURRENT_REVISION_NEW}"
             echo "No git tags found, falling back to revision ${TARGET_REVISION_NEW}"
             
             # Push the new tag to the remote repository
+            echo "Pushing a new tag for V${TARGET_REVISION_NEW}"
             git tag -a "V${TARGET_REVISION_NEW}" -m "V${TARGET_REVISION_NEW}"
             git push origin "V${TARGET_REVISION_NEW}" --force
             
@@ -149,6 +149,9 @@ jobs:
             #echo "Failed to get the new kernel revision"
             #exit 1
           fi
+          
+          # Remove the "V" prefix if it exists
+          TARGET_REVISION_NEW=${TARGET_REVISION_NEW#V}
           
           # Store and log the new current kernel revision
           TARGET_REVISION="${TARGET_REVISION_NEW}"
