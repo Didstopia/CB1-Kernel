@@ -71,10 +71,10 @@ jobs:
         timeout-minutes: 15
         uses: actions/checkout@v3
         with:
+          # Use the target branch instead of our current branch
           ref: ${{ env.TARGET_BRANCH }}
-          # Fetch depth is 1 by default, but we need to set it to 0,
-          # so that we have access to the latest branches, tags and commits!
-          fetch-depth: 0
+          # Always limit depth
+          fetch-depth: 1
 
       - name: Prepare Environment
         timeout-minutes: 5
@@ -103,6 +103,11 @@ jobs:
           TARGET_REVISION="current"
           IS_NEW_REVISION="false"
           
+          ##
+          ## NOTE: We can detect the current revision like so:
+          ##       grep -oP '(?<=REVISION=")[^"]+' scripts/main.sh
+          ##
+          
           # Detect and validate the current kernel revision (eg. "2.3.2")
           CURRENT_REVISION_NEW=${{ steps.prepare-kernel.outputs.revision }}
           if [ -z "$CURRENT_REVISION_NEW" ]; then
@@ -111,16 +116,15 @@ jobs:
             echo "is_new_revision=${IS_NEW_REVISION}" > $GITHUB_OUTPUT
             echo "Failed to get the current kernel revision"
             exit 1
-          else
-            # Store and log the current kernel revision
-            CURRENT_REVISION="${CURRENT_REVISION_NEW}"
-            echo "Detected current kernel revision: ${CURRENT_REVISION_NEW}"
           fi
           
-          ## TODO: Hopefully we don't need to do this,
-          ##       as the tags may change between the initial
-          ##       repo checkout and when this runs!
+          # Store and log the current kernel revision
+          CURRENT_REVISION="${CURRENT_REVISION_NEW}"
+          echo "Detected current kernel revision: ${CURRENT_REVISION_NEW}"
+          
           # Fetch the latest tags
+          #git remote add upstream git@github.com:bigtreetech/CB1-Kernel.git
+          #git fetch --tags upstream
           git fetch --tags
           
           # Get the latest repository tag, remove the "V" prefix
@@ -128,16 +132,24 @@ jobs:
           TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1`)
           TARGET_REVISION_NEW=${TARGET_REVISION_NEW#V}
           if [ -z "$TARGET_REVISION_NEW" ]; then
+            # Target the current revision instead
+            TARGET_REVISION_NEW="${CURRENT_REVISION_NEW}"
+            echo "No git tags found, falling back to revision ${TARGET_REVISION_NEW}"
+            
+            # Push the new tag to the remote repository
+            git tag -a "V${TARGET_REVISION_NEW}" -m "V${TARGET_REVISION_NEW}"
+            git push origin "V${TARGET_REVISION_NEW}" --force
+            
             # Output the current values and exit with an error code
-            echo "target_revision=${TARGET_REVISION}" > $GITHUB_OUTPUT
-            echo "is_new_revision=${IS_NEW_REVISION}" > $GITHUB_OUTPUT
-            echo "Failed to get the new kernel revision"
-            exit 1
-          else
-            # Store and log the new current kernel revision
-            TARGET_REVISION="${TARGET_REVISION_NEW}"
-            echo "Detected new kernel revision: ${TARGET_REVISION_NEW}"
+            #echo "target_revision=${TARGET_REVISION}" > $GITHUB_OUTPUT
+            #echo "is_new_revision=${IS_NEW_REVISION}" > $GITHUB_OUTPUT
+            #echo "Failed to get the new kernel revision"
+            #exit 1
           fi
+          
+          # Store and log the new current kernel revision
+          TARGET_REVISION="${TARGET_REVISION_NEW}"
+          echo "Detected new kernel revision: ${TARGET_REVISION_NEW}"
           
           # Compare the current and new kernel revisions
           if [ "$CURRENT_REVISION_NEW" = "$TARGET_REVISION" ]; then
