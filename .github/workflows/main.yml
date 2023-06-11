@@ -96,7 +96,7 @@ jobs:
         timeout-minutes: 5
         run: |-
           # Enable debugging
-          set -x
+          #set -x
         
           ## TODO: Add/change echo statements to utilize GHA logging instead!
           
@@ -335,7 +335,7 @@ jobs:
     needs: build
     
     # Only run if we got new builds
-    if: ${{ needs.build.outputs.updated }}
+    if: ${{ needs.build.outputs.updated == 'true' }}
 
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
