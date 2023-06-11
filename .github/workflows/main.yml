@@ -121,7 +121,7 @@ jobs:
           ##       as the tags may change between the initial
           ##       repo checkout and when this runs!
           # Fetch the latest tags
-          #git fetch --tags
+          git fetch --tags
           
           # Get the latest repository tag, remove the "V" prefix
           # (if any), and validate it as the new kernel revision
