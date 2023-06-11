@@ -142,6 +142,8 @@ jobs:
             
             # Push the new tag to the remote repository
             echo "Pushing a new tag for V${TARGET_REVISION_NEW}"
+            git config user.email "actions@github.com"
+            git config user.name "GitHub Actions"
             git tag -a "V${TARGET_REVISION_NEW}" -m "V${TARGET_REVISION_NEW}"
             git push origin "V${TARGET_REVISION_NEW}" --force
             
