@@ -130,7 +130,7 @@ jobs:
           # Fetch the latest tags
           #git remote add upstream git@github.com:bigtreetech/CB1-Kernel.git
           #git fetch --tags upstream
-          #git fetch --tags
+          git fetch --tags || true
           
           # Get the latest repository tag, remove the "V" prefix
           # (if any), and validate it as the new kernel revision
