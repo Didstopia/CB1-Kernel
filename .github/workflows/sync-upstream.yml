@@ -9,6 +9,17 @@ on:
     - cron: '0 0 * * *' 
   # Allow running manually
   workflow_dispatch:
+    inputs:
+      ref:
+        type: string
+        description: 'Target reference (eg. branch, tag etc.)'
+        required: true
+        default: 'kernel-5.16'
+      force:
+        type: boolean
+        description: 'Forced build and deploy (also updates cache)'
+        required: false
+        default: false
 
 jobs:
 
@@ -22,8 +33,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          # Specifically use the "kernel-5.16" branch for the target
-          ref: kernel-5.16
+          # Always pull the requested ref, or a hardcoded fallback value
+          ref: ${{ github.event.inputs.ref || 'kernel-5.16' }}
           # No need to persist credentials in this case
           persist-credentials: false
 
@@ -40,10 +51,24 @@ jobs:
           # The action to run and retry on failure
           action: aormsby/Fork-Sync-With-Upstream-action@v3.4
           # The arguments for the retry action above
-          with: |
-            target_sync_branch: kernel-5.16
-            target_branch_push_args: --force --all
-            target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-            upstream_sync_branch: kernel-5.16
+          with: |-
+            # Set the upstream repository
             upstream_sync_repo: bigtreetech/CB1-Kernel
+            # Set the upstream branch/ref to the requested ref, or a hardcoded fallback value
+            upstream_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
+            # Deal with merge conflicts by always preferring upstream,
+            # and in some cases also allowing unrelated histories when merging,
+            # with the unshallow option dealing with non-zero depth issues
+            upstream_pull_args: '-s recursive -Xtheirs --allow-unrelated-histories --unshallow'
+            # Set the target branch/ref to the requested ref, or a hardcoded fallback value
+            target_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
+            # Always force push everything, including tags
+            target_branch_push_args: '--force --all'
+            # GitHub token which gives us push privileges
+            target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+            # Increase the shallow depth time range
+            shallow_since: '6 months ago'
+            # Enable git rebasing
             git_config_pull_rebase: true
+            # Enable test mode for dry run testing and debugging
+            #test_mode: true
