@@ -75,6 +75,7 @@ jobs:
           ref: ${{ env.TARGET_BRANCH }}
           # Always limit depth
           #fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare Environment
         timeout-minutes: 5
@@ -92,6 +93,7 @@ jobs:
 
       - name: Check Kernel Revision
         id: check-kernel-revision
+        timeout-minutes: 5
         run: |-
           # Enable debugging
           set -x
@@ -132,7 +134,7 @@ jobs:
           
           # Get the latest repository tag, remove the "V" prefix
           # (if any), and validate it as the new kernel revision
-          TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1 2>/dev/null` 2>/dev/null)
+          TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1 2>/dev/null` 2>/dev/null) || true
           if [ -z "$TARGET_REVISION_NEW" ]; then
             # Target the current revision instead
             TARGET_REVISION_NEW="${CURRENT_REVISION_NEW}"
