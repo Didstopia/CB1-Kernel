@@ -129,7 +129,7 @@ jobs:
           
           # Get the latest repository tag, remove the "V" prefix
           # (if any), and validate it as the new kernel revision
-          TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1`)
+          TARGET_REVISION_NEW=$(git describe --tags `git rev-list --tags --max-count=1` 2>/dev/null)
           TARGET_REVISION_NEW=${TARGET_REVISION_NEW#V}
           if [ -z "$TARGET_REVISION_NEW" ]; then
             # Target the current revision instead
