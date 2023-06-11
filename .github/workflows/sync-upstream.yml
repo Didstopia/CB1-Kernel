@@ -42,6 +42,7 @@ jobs:
           # The arguments for the retry action above
           with: |
             target_sync_branch: kernel-5.16
+            target_branch_push_args: --force --all
             target_repo_token: ${{ secrets.GITHUB_TOKEN }}
             upstream_sync_branch: kernel-5.16
             upstream_sync_repo: bigtreetech/CB1-Kernel
