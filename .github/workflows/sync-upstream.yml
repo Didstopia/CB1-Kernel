@@ -45,6 +45,7 @@ jobs:
         uses: Didstopia/Actions/sync-upstream@master
         with:
           upstream-repo: bigtreetech/CB1-Kernel
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       # Sync upstream repository (with automatic retry support)
       #- name: Sync Upstream Repository
