@@ -42,7 +42,7 @@ jobs:
       - name: Sync Upstream Repository
         id: sync
         # uses: ./.github/actions/sync-upstream
-        uses: Didstopia/CB1-Kernel@build/./.github/actions/sync-upstream
+        uses: Didstopia/Actions/sync-upstream@master
         with:
           upstream-repo: bigtreetech/CB1-Kernel
 
