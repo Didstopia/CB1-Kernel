@@ -38,26 +38,33 @@ jobs:
           # No need to persist credentials in this case
           persist-credentials: false
 
-      # Sync upstream repository (with automatic retry support)
+      # Sync upstream repository
       - name: Sync Upstream Repository
         id: sync
-        #uses: Wandalen/wretry.action@master
-        uses: Wandalen/wretry.action@v1.0.36
+        uses: ./.github/actions/sync-upstream
         with:
-          # Attempt 3 times before giving up
-          attempt_limit: 3
-          # Delay each attempt by 1 minute
-          attempt_delay: 60000
-          # The action to run and retry on failure
-          action: aormsby/Fork-Sync-With-Upstream-action@v3.4
-          # The arguments for the retry action above
-          with: |
-            upstream_sync_repo: bigtreetech/CB1-Kernel
-            upstream_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
-            upstream_pull_args: '-s recursive -Xtheirs --allow-unrelated-histories --unshallow'
-            target_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
-            target_branch_push_args: '--force --all'
-            target_repo_token: ${{ secrets.GITHUB_TOKEN }}
-            shallow_since: '6 months ago'
-            git_config_pull_rebase: true
-            test_mode: false
+          upstream-repo: bigtreetech/CB1-Kernel
+
+      # Sync upstream repository (with automatic retry support)
+      #- name: Sync Upstream Repository
+      #  id: sync
+      #  #uses: Wandalen/wretry.action@master
+      #  uses: Wandalen/wretry.action@v1.0.36
+      #  with:
+      #    # Attempt 3 times before giving up
+      #    attempt_limit: 3
+      #    # Delay each attempt by 1 minute
+      #    attempt_delay: 60000
+      #    # The action to run and retry on failure
+      #    action: aormsby/Fork-Sync-With-Upstream-action@v3.4
+      #    # The arguments for the retry action above
+      #    with: |
+      #      upstream_sync_repo: bigtreetech/CB1-Kernel
+      #      upstream_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
+      #      upstream_pull_args: '-s recursive -Xtheirs --allow-unrelated-histories --unshallow'
+      #      target_sync_branch: ${{ github.event.inputs.ref || 'kernel-5.16' }}
+      #      target_branch_push_args: '--force --all'
+      #      target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+      #      shallow_since: '6 months ago'
+      #      git_config_pull_rebase: true
+      #      test_mode: false
