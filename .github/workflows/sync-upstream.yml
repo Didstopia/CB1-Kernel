@@ -37,6 +37,8 @@ jobs:
           ref: ${{ github.event.inputs.ref || 'kernel-5.16' }}
           # No need to persist credentials in this case
           persist-credentials: false
+          # Speed up the cloning by reducing the depth
+          fetch-depth: 1
 
       # Sync upstream repository
       - name: Sync Upstream Repository
