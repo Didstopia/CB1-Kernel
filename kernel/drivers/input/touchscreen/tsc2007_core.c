@@ -28,6 +28,8 @@
 #include <linux/platform_data/tsc2007.h>
 #include "tsc2007.h"
 
+#define POLL_INTERVAL_MS 17 /* 17ms = 60fps */
+
 int tsc2007_xfer(struct tsc2007 *tsc, u8 cmd)
 {
 	s32 data;
@@ -68,22 +70,25 @@ static void tsc2007_read_values(struct tsc2007 *tsc, struct ts_event *tc)
 
 u32 tsc2007_calculate_resistance(struct tsc2007 *tsc, struct ts_event *tc)
 {
-	u32 rt = 0;
+    u32 rt = 0;
+    if (tc->x == MAX_12BIT){
+        /* dev_info(&tsc->client->dev, "[DEBUG TSC] RESISTANCE CALCULATED | TC->X is MAX_12BIT Force to 0 || TC Z1: (%4d) | TC Z2: (%4d) | TC X: (%4d) | TC Y: (%4d)", tc->z1, tc->z2, tc->x, tc->y);*/
+        tc->x = 0;
+    }
 
-	/* range filtering */
-	if (tc->x == MAX_12BIT)
-		tc->x = 0;
+    if (tc->y == MAX_12BIT){
+        /*dev_info(&tsc->client->dev, "[DEBUG TSC] RESISTANCE CALCULATED | TC->Y is MAX_12BIT Force to 0 || TC Z1: (%4d) | TC Z2: (%4d) | TC X: (%4d) | TC Y: (%4d)", tc->z1, tc->z2, tc->x, tc->y);*/
+        tc->y = 0;
+    }
 
-	if (likely(tc->x && tc->z1)) {
-		/* compute touch resistance using equation #1 */
-		rt = tc->z2 - tc->z1;
-		rt *= tc->x;
-		rt *= tsc->x_plate_ohms;
-		rt /= tc->z1;
-		rt = (rt + 2047) >> 12;
-	}
 
-	return rt;
+    if (likely(tc->x && tc->y && tc->z1)) {
+        return (tsc->x_plate_ohms * tc->x / 4096) * ((4096 / tc->z1) - 1) - tsc->y_plate_ohms * (1 - tc->y / 4096);
+    }else{
+       /*dev_info(&tsc->client->dev, "[DEBUG TSC] RESISTANCE CALCULATED | Missing mandatory Data TCX(%4d) | TCY(%4d) | TCZ1(%4d)",tc->x,tc->y,tc->z1);*/
+       return false;
+    }
+
 }
 
 bool tsc2007_is_pen_down(struct tsc2007 *ts)
@@ -172,6 +177,58 @@ static irqreturn_t tsc2007_soft_irq(int irq, void *handle)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t tsc2007_soft_poll(int irq, void *handle)
+{
+	struct tsc2007 *ts = handle;
+	struct input_dev *input = ts->input;
+	struct ts_event tc;
+	u32 rt;
+	bool skipSync = false;
+
+	if(!ts->stopped) {
+
+		mutex_lock(&ts->mlock);
+		tsc2007_read_values(ts, &tc);
+		mutex_unlock(&ts->mlock);
+
+		rt = tsc2007_calculate_resistance(ts, &tc);
+
+        if (likely(rt)) {
+
+            /* range >= 0 && <= 4096 */
+            if (rt > 0 && rt <= ts->max_rt) {
+                    rt = ts->max_rt - rt;
+                    input_report_key(input, BTN_TOUCH, 1);
+                    input_report_abs(input, ABS_X, tc.y);
+                    input_report_abs(input, ABS_Y, 4096 - tc.x);
+                    input_report_abs(input, ABS_PRESSURE, rt);
+                    input_sync(input);
+                    /*dev_info(&ts->client->dev, "[DEBUG TSC] TOUCH TRIGGERED | RT: (%4d) | TC Z1: (%4d) | TC Z2: (%4d) | TC X: (%4d) | TC Y: (%4d)", rt, tc.z1, tc.z2, tc.x, tc.y);*/
+
+            } else {
+                //Discard Input Ghost or inconsistent
+                /*dev_info(&ts->client->dev, "[DEBUG TSC] TOUCH DISCARD | RT: (%4d) | TC Z1: (%4d) | TC Z2: (%4d) | TC X: (%4d) | TC Y: (%4d)", rt, tc.z1, tc.z2, tc.x, tc.y);*/
+                skipSync= true;
+            }
+        }else{
+       	    // No touch event or missing data for rt calculation
+            skipSync= true;
+        }
+
+	}else{
+	    // TFT Not initialized
+	    /* dev_info(&ts->client->dev, "DEBUG TSC: TouchScreen Stopped"); */
+	}
+
+    if(skipSync){
+        input_report_key(input, BTN_TOUCH, 0);
+        input_report_abs(input, ABS_PRESSURE, 0);
+        input_sync(input);
+    }
+
+	return IRQ_HANDLED;
+}
+
 static irqreturn_t tsc2007_hard_irq(int irq, void *handle)
 {
 	struct tsc2007 *ts = handle;
@@ -229,10 +286,31 @@ static int tsc2007_get_pendown_state_gpio(struct device *dev)
 	return gpiod_get_value(ts->gpiod);
 }
 
+static void tsc2007_ts_irq_poll_timer(struct timer_list *t)
+{
+	struct tsc2007 *ts = from_timer(ts, t, timer);
+
+	schedule_work(&ts->work_i2c_poll);
+	mod_timer(&ts->timer, jiffies + msecs_to_jiffies(POLL_INTERVAL_MS));
+}
+
+static void tsc2007_ts_work_i2c_poll(struct work_struct *work)
+{
+	struct tsc2007 *ts = container_of(work,
+			struct tsc2007, work_i2c_poll);
+
+	tsc2007_soft_poll(0, ts);
+}
+
 static int tsc2007_probe_properties(struct device *dev, struct tsc2007 *ts)
 {
 	u32 val32;
 	u64 val64;
+
+	ts->ignore_nak = device_property_read_bool(dev, "i2c,ignore-nak");
+
+	if (!device_property_read_u32(dev, "ti,rt-thr", &val32))
+		ts->rt_thr = val32;
 
 	if (!device_property_read_u32(dev, "ti,max-rt", &val32))
 		ts->max_rt = val32;
@@ -257,6 +335,13 @@ static int tsc2007_probe_properties(struct device *dev, struct tsc2007 *ts)
 		ts->x_plate_ohms = val32;
 	} else {
 		dev_err(dev, "Missing ti,x-plate-ohms device property\n");
+		return -EINVAL;
+	}
+
+	if (!device_property_read_u32(dev, "ti,y-plate-ohms", &val32)) {
+		ts->y_plate_ohms = val32;
+	} else {
+		dev_err(dev, "Missing ti,y-plate-ohms device property\n");
 		return -EINVAL;
 	}
 
@@ -330,6 +415,9 @@ static int tsc2007_probe(struct i2c_client *client,
 	if (!input_dev)
 		return -ENOMEM;
 
+	if (ts->ignore_nak)
+		client->flags |= I2C_M_IGNORE_NAK;
+
 	i2c_set_clientdata(client, ts);
 
 	ts->client = client;
@@ -375,14 +463,23 @@ static int tsc2007_probe(struct i2c_client *client,
 			pdata->init_platform_hw();
 	}
 
-	err = devm_request_threaded_irq(&client->dev, ts->irq,
-					tsc2007_hard_irq, tsc2007_soft_irq,
-					IRQF_ONESHOT,
-					client->dev.driver->name, ts);
-	if (err) {
-		dev_err(&client->dev, "Failed to request irq %d: %d\n",
-			ts->irq, err);
-		return err;
+	if (ts->gpiod) {
+		err = devm_request_threaded_irq(&client->dev, ts->irq,
+						tsc2007_hard_irq, tsc2007_soft_irq,
+						IRQF_ONESHOT,
+						client->dev.driver->name, ts);
+		if (err) {
+			dev_err(&client->dev, "Failed to request irq %d: %d\n",
+				ts->irq, err);
+			return err;
+		}
+	} else {
+		INIT_WORK(&ts->work_i2c_poll,
+			  tsc2007_ts_work_i2c_poll);
+		timer_setup(&ts->timer, tsc2007_ts_irq_poll_timer, 0);
+		ts->timer.expires = jiffies +
+					msecs_to_jiffies(POLL_INTERVAL_MS);
+		add_timer(&ts->timer);
 	}
 
 	tsc2007_stop(ts);
